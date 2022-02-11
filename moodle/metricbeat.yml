@@ -1,0 +1,16 @@
+metricbeat.modules:
+- module: apache
+  metricsets: ["status"]
+  period: 10s
+  enabled: true
+  hosts: ["http://127.0.0.1:8080"]
+  ssl.verification_mode: none
+
+
+setup.kibana:
+  host: "http://kibana:5601"
+  username: ${ELASTICSEARCH_USERNAME}
+  password: ${ELASTICSEARCH_PASSWORD}
+
+output.logstash:
+  hosts: ["logstash:5044"]

@@ -1,0 +1,50 @@
+# setup.dashboards.enabled: true
+# setup.dashboards.directory: "/tmp/dashboards/"
+# setup.dashboards.file: "/tmp/dashboards/apache2.zip"
+# ========================================================
+# ================= START MODULES ========================
+# ========================================================
+
+metricbeat.modules:
+- module: mysql
+  metricsets: ["status"]
+  hosts: ["tcp(mariadb:3306)/"] 
+  username: ${MYSQL_CLIENT_DATABASE_ROOT_USER}
+  password: ""
+  
+- module: apache
+  metricsets: ["status"]
+  period: 10s
+  enabled: true
+  hosts: ["moodle:8181"]
+  ssl.verification_mode: none
+
+- module: docker
+  metricsets:
+    - "container"
+    - "cpu"
+    - "diskio"
+    - "event"
+    - "healthcheck"
+    - "info"
+    - "image"
+    - "memory"
+    - "network"
+    - "network_summary"
+  hosts: ["unix:///var/run/docker.sock"]
+  period: 10s
+  enabled: true
+
+# ========================================================
+# =================== END MODULES ========================
+# ========================================================
+
+setup.kibana:
+  host: "http://kibana:5601"
+  username: "elastic"
+  password: "changeme"
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+# ssl.verification_mode: none

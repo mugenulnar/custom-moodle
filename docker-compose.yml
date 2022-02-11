@@ -1,0 +1,123 @@
+version: '3'
+
+services:
+
+  curl:
+    build:
+      context: curl/
+      dockerfile: Dockerfile
+    depends_on:
+      - elasticsearch
+      - metricbeat
+      - moodle
+      - kibana
+    volumes:
+      - ./metricbeat-moodle/dashboards:/opt/dashboards
+      - ./curl/curl-script.sh:/opt/curl-script.sh
+    entrypoint: /opt/curl-script.sh
+
+  # =====================================================
+  # =====================================================
+  # =================== MOODLE ==========================
+  # =====================================================
+  # =====================================================
+  mariadb:
+    image: docker.io/bitnami/mariadb:10.3
+    env_file: .env
+    volumes:
+      - 'mariadb_data:/bitnami/mariadb'
+
+  moodle:
+    build:
+      context: moodle/
+      dockerfile: Dockerfile
+    user: "root:root"
+    env_file: .env
+    ports:
+      - '8081:8181'
+      # - '443:8443'
+    volumes:
+      - 'moodle_data:/bitnami/moodle'
+      - 'moodledata_data:/bitnami/moodledata'
+      - ./moodle/server-status.conf:/opt/bitnami/php/etc/conf.d/server-status.conf 
+    depends_on:
+      - mariadb
+    
+  # =====================================================
+  # =====================================================
+  # ====================== ELK ==========================
+  # =====================================================
+  # =====================================================
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:${ELK_VERSION}
+    env_file: .env
+    volumes:
+      - ./metricbeat-moodle/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - /proc:/hostfs/proc:ro
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /:/hostfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./metricbeat-moodle/dashboards:/tmp/dashboards
+    depends_on:
+      - kibana
+    
+
+  elasticsearch:
+    build:
+      context: elasticsearch/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    volumes:
+      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro,z
+      - elasticsearch:/usr/share/elasticsearch/data:z
+    # ports:
+      # - "9200:9200"
+      # - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: changeme
+      # Use single node discovery in order to disable production mode and avoid bootstrap checks.
+      # see: https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
+      discovery.type: single-node
+    
+  logstash:
+    build:
+      context: logstash/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro,z
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro,z
+    # ports:
+    #   - "5044:5044"
+    #   - "5000:5000/tcp"
+    #   - "5000:5000/udp"
+    #   - "9600:9600"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    build:
+      context: kibana/
+      args:
+        ELK_VERSION: $ELK_VERSION
+    volumes:
+      - ./kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml:ro,z
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+   
+
+volumes:
+  mariadb_data:
+    driver: local
+  moodle_data:
+    driver: local
+  moodledata_data:
+    driver: local
+  elasticsearch:
+    driver: local
+
